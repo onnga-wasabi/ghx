@@ -52,6 +52,7 @@ type NotificationsView struct {
 
 	stateFilter string // "unread" or "all"
 	typeIdx     int
+	filterQuery string
 
 	showSidebar bool
 	loading     bool
@@ -194,15 +195,27 @@ func (v *NotificationsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 	return v, nil
 }
 
+func (v *NotificationsView) SetFilter(query string) {
+	v.filterQuery = query
+	v.applyFilter()
+}
+
 func (v *NotificationsView) applyFilter() {
 	var filtered []model.Notification
 	typeFilter := notifTypeFilters[v.typeIdx].typeName
+	lower := strings.ToLower(v.filterQuery)
 	for _, n := range v.allNotifs {
 		if v.stateFilter == "unread" && !n.Unread {
 			continue
 		}
 		if typeFilter != "" && n.Type != typeFilter {
 			continue
+		}
+		if lower != "" {
+			text := strings.ToLower(fmt.Sprintf("%s %s %s", n.Title, n.RepoName, n.Reason))
+			if !strings.Contains(text, lower) {
+				continue
+			}
 		}
 		filtered = append(filtered, n)
 	}

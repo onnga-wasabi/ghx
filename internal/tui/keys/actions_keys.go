@@ -13,6 +13,10 @@ type ActionsKeyMap struct {
 	WordWrap     key.Binding
 	SearchNext   key.Binding
 	SearchPrev   key.Binding
+	ExpandAll    key.Binding
+	CollapseAll  key.Binding
+	NextSection  key.Binding
+	PrevSection  key.Binding
 }
 
 var Actions = ActionsKeyMap{
@@ -56,15 +60,32 @@ var Actions = ActionsKeyMap{
 		key.WithKeys("N"),
 		key.WithHelp("N", "prev match"),
 	),
+	ExpandAll: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "expand all sections"),
+	),
+	CollapseAll: key.NewBinding(
+		key.WithKeys("x"),
+		key.WithHelp("x", "collapse all sections"),
+	),
+	NextSection: key.NewBinding(
+		key.WithKeys("]"),
+		key.WithHelp("]", "next section"),
+	),
+	PrevSection: key.NewBinding(
+		key.WithKeys("["),
+		key.WithHelp("[", "prev section"),
+	),
 }
 
 func (k ActionsKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.StatusToggle, k.Trigger, k.Rerun, k.Cancel, k.Fullscreen, k.LogToggle}
+	return []key.Binding{k.StatusToggle, k.Rerun, k.Cancel, k.Fullscreen, k.ExpandAll, k.CollapseAll}
 }
 
 func (k ActionsKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.StatusToggle, k.Trigger, k.Rerun, k.RerunFailed, k.Cancel},
 		{k.Fullscreen, k.LogToggle, k.WordWrap, k.SearchNext, k.SearchPrev},
+		{k.ExpandAll, k.CollapseAll, k.NextSection, k.PrevSection},
 	}
 }

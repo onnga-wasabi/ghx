@@ -202,6 +202,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.filter.IsActive() {
 			var cmd tea.Cmd
 			a.filter, cmd = a.filter.Update(msg)
+			if !a.filter.IsActive() {
+				a.views[a.tabs.Active].SetFilter(a.filter.Value())
+			}
+			return a, cmd
+		}
+
+		if im, ok := a.views[a.tabs.Active].(views.InputModeView); ok && im.IsInputMode() {
+			activeView := a.views[a.tabs.Active]
+			var newView views.View
+			var cmd tea.Cmd
+			newView, cmd = activeView.Update(msg)
+			a.views[a.tabs.Active] = newView
 			return a, cmd
 		}
 
@@ -233,9 +245,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		switch {
-		case key.Matches(msg, keys.Global.Filter):
-			return a, a.filter.Activate()
+		if key.Matches(msg, keys.Global.Filter) {
+			if interceptor, ok := a.views[a.tabs.Active].(views.FilterKeyInterceptor); ok && interceptor.WantsFilterKey() {
+				// Let the view handle / (e.g., log search)
+			} else {
+				return a, a.filter.Activate()
+			}
 		}
 
 		for _, ck := range a.customKeys {

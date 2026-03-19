@@ -50,7 +50,9 @@ type PRsView struct {
 
 	stateFilter string // "open" or "closed"
 	scopeIdx    int
+	filterQuery string
 
+	allPRs  []model.PR
 	prs     []model.PR
 	table   *components.Table
 	sidebar *components.Sidebar
@@ -148,8 +150,8 @@ func (v *PRsView) Update(msg tea.Msg) (View, tea.Cmd) {
 			v.err = msg.err
 			return v, nil
 		}
-		v.prs = msg.prs
-		v.updateTable()
+		v.allPRs = msg.prs
+		v.applyFilter()
 		v.updateSidebar()
 
 	case prActionMsg:
@@ -306,6 +308,28 @@ func (v *PRsView) selectedPR() *model.PR {
 		return &v.prs[v.table.Cursor]
 	}
 	return nil
+}
+
+func (v *PRsView) SetFilter(query string) {
+	v.filterQuery = query
+	v.applyFilter()
+}
+
+func (v *PRsView) applyFilter() {
+	if v.filterQuery == "" {
+		v.prs = v.allPRs
+	} else {
+		lower := strings.ToLower(v.filterQuery)
+		var filtered []model.PR
+		for _, pr := range v.allPRs {
+			text := strings.ToLower(fmt.Sprintf("#%d %s %s %s", pr.Number, pr.Title, pr.Author, pr.HeadRef))
+			if strings.Contains(text, lower) {
+				filtered = append(filtered, pr)
+			}
+		}
+		v.prs = filtered
+	}
+	v.updateTable()
 }
 
 func (v *PRsView) updateTable() {

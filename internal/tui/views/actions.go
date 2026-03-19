@@ -90,6 +90,7 @@ type ActionsView struct {
 
 	statusIdx     int
 	selectedWfIdx int
+	filterQuery   string
 
 	focusPane   int // 0=workflows, 1=runs, 2=jobs, 3=logs
 	fullscreen  bool
@@ -134,6 +135,14 @@ func NewActionsView(client *api.Client, owner, repo string, smartLayout bool) *A
 }
 
 func (v *ActionsView) Name() string { return "Actions" }
+
+func (v *ActionsView) WantsFilterKey() bool {
+	return v.focusPane == 3 && v.showLogs
+}
+
+func (v *ActionsView) IsInputMode() bool {
+	return v.logViewer.IsSearching()
+}
 
 func (v *ActionsView) ShowRunsForBranch(branch string) tea.Cmd {
 	v.loading = true
@@ -336,6 +345,12 @@ func (v *ActionsView) Update(msg tea.Msg) (View, tea.Cmd) {
 }
 
 func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
+	if v.logViewer.IsSearching() {
+		var cmd tea.Cmd
+		v.logViewer, cmd = v.logViewer.Update(msg)
+		return v, cmd
+	}
+
 	switch {
 	case key.Matches(msg, keys.Global.Left):
 		if v.fullscreen {
@@ -359,8 +374,12 @@ func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 		}
 		return v, nil
 	case key.Matches(msg, keys.Global.Enter):
-		if v.focusPane == 1 {
+		switch v.focusPane {
+		case 1:
 			return v, v.toggleRunExpansion()
+		case 3:
+			v.logViewer.ToggleCurrentSection()
+			return v, nil
 		}
 		return v, nil
 	case key.Matches(msg, keys.Actions.StatusToggle):
@@ -406,6 +425,27 @@ func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 	}
 
 	if v.focusPane == 3 {
+		if v.logViewer.IsSearching() {
+			var cmd tea.Cmd
+			v.logViewer, cmd = v.logViewer.Update(msg)
+			return v, cmd
+		}
+		switch {
+		case key.Matches(msg, keys.Global.Filter):
+			return v, v.logViewer.StartSearch()
+		case key.Matches(msg, keys.Actions.ExpandAll):
+			v.logViewer.ExpandAll()
+			return v, nil
+		case key.Matches(msg, keys.Actions.CollapseAll):
+			v.logViewer.CollapseAll()
+			return v, nil
+		case key.Matches(msg, keys.Actions.PrevSection):
+			v.logViewer.PrevSection()
+			return v, nil
+		case key.Matches(msg, keys.Actions.NextSection):
+			v.logViewer.NextSection()
+			return v, nil
+		}
 		var cmd tea.Cmd
 		v.logViewer, cmd = v.logViewer.Update(msg)
 		return v, cmd
@@ -823,13 +863,17 @@ func (v *ActionsView) renderWithOverlay() string {
 	return lipgloss.Place(v.width, v.height, lipgloss.Center, lipgloss.Center, overlay)
 }
 
+func (v *ActionsView) SetFilter(query string) {
+	v.filterQuery = query
+	v.applyStatusFilter()
+}
+
 func (v *ActionsView) applyStatusFilter() {
 	sf := statusFilters[v.statusIdx].filter
-	if sf == "" {
-		v.runs = v.allRuns
-	} else {
-		var filtered []model.Run
-		for _, r := range v.allRuns {
+	lower := strings.ToLower(v.filterQuery)
+	var filtered []model.Run
+	for _, r := range v.allRuns {
+		if sf != "" {
 			match := false
 			switch sf {
 			case "success":
@@ -839,10 +883,21 @@ func (v *ActionsView) applyStatusFilter() {
 			case "in_progress":
 				match = r.Status == "in_progress" || r.Status == "queued" || r.Status == "waiting" || r.Status == "pending" || r.Status == "requested"
 			}
-			if match {
-				filtered = append(filtered, r)
+			if !match {
+				continue
 			}
 		}
+		if lower != "" {
+			text := strings.ToLower(fmt.Sprintf("%s %s %s", r.Name, r.HeadBranch, r.Conclusion))
+			if !strings.Contains(text, lower) {
+				continue
+			}
+		}
+		filtered = append(filtered, r)
+	}
+	if sf == "" && lower == "" {
+		v.runs = v.allRuns
+	} else {
 		v.runs = filtered
 	}
 	v.expandedRuns = make(map[int64]bool)

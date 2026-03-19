@@ -15,6 +15,15 @@ type View interface {
 	View() string
 	SetSize(width, height int)
 	KeyMap() help.KeyMap
+	SetFilter(query string)
+}
+
+type FilterKeyInterceptor interface {
+	WantsFilterKey() bool
+}
+
+type InputModeView interface {
+	IsInputMode() bool
 }
 
 // distributeHeight splits total height among n panes so that

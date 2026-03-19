@@ -49,8 +49,10 @@ type IssuesView struct {
 
 	stateFilter string // "open" or "closed"
 	scopeIdx    int
+	filterQuery string
 
-	issues  []model.Issue
+	allIssues []model.Issue
+	issues    []model.Issue
 	table   *components.Table
 	sidebar *components.Sidebar
 
@@ -141,8 +143,8 @@ func (v *IssuesView) Update(msg tea.Msg) (View, tea.Cmd) {
 			v.err = msg.err
 			return v, nil
 		}
-		v.issues = msg.issues
-		v.updateTable()
+		v.allIssues = msg.issues
+		v.applyFilter()
 		v.updateSidebar()
 
 	case issueActionMsg:
@@ -276,6 +278,28 @@ func (v *IssuesView) selectedIssue() *model.Issue {
 		return &v.issues[v.table.Cursor]
 	}
 	return nil
+}
+
+func (v *IssuesView) SetFilter(query string) {
+	v.filterQuery = query
+	v.applyFilter()
+}
+
+func (v *IssuesView) applyFilter() {
+	if v.filterQuery == "" {
+		v.issues = v.allIssues
+	} else {
+		lower := strings.ToLower(v.filterQuery)
+		var filtered []model.Issue
+		for _, issue := range v.allIssues {
+			text := strings.ToLower(fmt.Sprintf("#%d %s %s", issue.Number, issue.Title, issue.Author))
+			if strings.Contains(text, lower) {
+				filtered = append(filtered, issue)
+			}
+		}
+		v.issues = filtered
+	}
+	v.updateTable()
 }
 
 func (v *IssuesView) updateTable() {
