@@ -34,11 +34,10 @@ A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in 
 go install github.com/onnga-wasabi/ghx/cmd/main.go@latest
 ```
 
-### Homebrew (after first release)
+### Homebrew
 
 ```bash
-brew tap onnga-wasabi/tap
-brew install ghx
+brew install onnga-wasabi/tap/ghx
 ```
 
 ### From Source
