@@ -50,11 +50,40 @@ make install
 
 ### Nix Flake
 
+```bash
+nix profile install github:onnga-wasabi/ghx
+```
+
+### Nix Home Manager
+
 ```nix
+# flake.nix
 {
-  inputs.ghx.url = "github:onnga-wasabi/ghx";
-  # Then add ghx.packages.${system}.default to your packages
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    ghx.url = "github:onnga-wasabi/ghx";
+  };
+
+  outputs = { nixpkgs, home-manager, ghx, ... }: {
+    # Use the overlay so ghx is available as pkgs.ghx
+    homeConfigurations."you" = home-manager.lib.homeManagerConfiguration {
+      pkgs = import nixpkgs {
+        system = "aarch64-darwin"; # or x86_64-linux, etc.
+        overlays = [ ghx.overlays.default ];
+      };
+      modules = [{
+        home.packages = [ pkgs.ghx ];
+      }];
+    };
+  };
 }
+```
+
+Or without overlay, reference the package directly:
+
+```nix
+home.packages = [ ghx.packages.${system}.default ];
 ```
 
 ## Prerequisites
