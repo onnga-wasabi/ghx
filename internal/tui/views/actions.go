@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -55,12 +56,27 @@ type runTableEntry struct {
 	jobID int64
 }
 
+type statusFilter struct {
+	label  string
+	filter string // "" = all, "success", "failure", "in_progress"
+}
+
+var statusFilters = []statusFilter{
+	{label: "All", filter: ""},
+	{label: "✓ Success", filter: "success"},
+	{label: "✗ Failed", filter: "failure"},
+	{label: "⏳ Running", filter: "in_progress"},
+}
+
+const actionsFilterBarH = 1
+
 type ActionsView struct {
 	client *api.Client
 	owner  string
 	repo   string
 
 	workflows []model.Workflow
+	allRuns   []model.Run
 	runs      []model.Run
 	jobs      []model.Job
 	wfTable   *components.Table
@@ -71,6 +87,9 @@ type ActionsView struct {
 	expandedRuns    map[int64]bool
 	runJobs         map[int64][]model.Job
 	runTableEntries []runTableEntry
+
+	statusIdx   int
+	selectedWfIdx int
 
 	focusPane   int // 0=workflows, 1=runs, 2=jobs, 3=logs
 	fullscreen  bool
@@ -145,6 +164,10 @@ func (v *ActionsView) SetSize(w, h int) {
 	v.recalcLayout()
 }
 
+func (v *ActionsView) paneHeight() int {
+	return max(4, v.height-actionsFilterBarH)
+}
+
 func (v *ActionsView) recalcLayout() {
 	if v.fullscreen {
 		v.logViewer.SetSize(v.width, v.height)
@@ -152,6 +175,7 @@ func (v *ActionsView) recalcLayout() {
 		return
 	}
 
+	ph := v.paneHeight()
 	var wfW, runW, jobW, logW int
 
 	if v.smartLayout {
@@ -186,12 +210,12 @@ func (v *ActionsView) recalcLayout() {
 	}
 
 	v.wfTable.Width = wfW
-	v.wfTable.Height = v.height
+	v.wfTable.Height = ph
 	v.runTable.Width = runW
-	v.runTable.Height = v.height
+	v.runTable.Height = ph
 	v.jobTable.Width = jobW
-	v.jobTable.Height = v.height
-	v.logViewer.SetSize(logW, v.height)
+	v.jobTable.Height = ph
+	v.logViewer.SetSize(logW, ph)
 
 	v.wfTable.Active = v.focusPane == 0
 	v.runTable.Active = v.focusPane == 1
@@ -225,8 +249,8 @@ func (v *ActionsView) Update(msg tea.Msg) (View, tea.Cmd) {
 			v.err = msg.err
 			return v, nil
 		}
-		v.runs = msg.runs
-		v.updateRunTable()
+		v.allRuns = msg.runs
+		v.applyStatusFilter()
 		if len(v.runs) > 0 {
 			return v, v.fetchJobs(v.runs[0].ID)
 		}
@@ -304,6 +328,10 @@ func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 		if v.focusPane == 1 {
 			return v, v.toggleRunExpansion()
 		}
+		return v, nil
+	case key.Matches(msg, keys.Actions.StatusToggle):
+		v.statusIdx = (v.statusIdx + 1) % len(statusFilters)
+		v.applyStatusFilter()
 		return v, nil
 	case key.Matches(msg, keys.Global.Refresh):
 		return v, v.fetchWorkflows()
@@ -691,12 +719,14 @@ func (v *ActionsView) View() string {
 		v.logViewer.Title = "Logs"
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	filterBar := v.renderFilterBar()
+	panes := lipgloss.JoinHorizontal(lipgloss.Top,
 		v.wfTable.View(),
 		v.runTable.View(),
 		v.jobTable.View(),
 		v.logViewer.View(),
 	)
+	return lipgloss.JoinVertical(lipgloss.Left, filterBar, panes)
 }
 
 func (v *ActionsView) renderWithOverlay() string {
@@ -707,6 +737,57 @@ func (v *ActionsView) renderWithOverlay() string {
 		Render(v.confirmMsg + " (y/n)")
 
 	return lipgloss.Place(v.width, v.height, lipgloss.Center, lipgloss.Center, overlay)
+}
+
+func (v *ActionsView) applyStatusFilter() {
+	sf := statusFilters[v.statusIdx].filter
+	if sf == "" {
+		v.runs = v.allRuns
+	} else {
+		var filtered []model.Run
+		for _, r := range v.allRuns {
+			match := false
+			switch sf {
+			case "success":
+				match = r.Conclusion == "success"
+			case "failure":
+				match = r.Conclusion == "failure" || r.Conclusion == "timed_out"
+			case "in_progress":
+				match = r.Status == "in_progress" || r.Status == "queued" || r.Status == "waiting" || r.Status == "pending" || r.Status == "requested"
+			}
+			if match {
+				filtered = append(filtered, r)
+			}
+		}
+		v.runs = filtered
+	}
+	v.expandedRuns = make(map[int64]bool)
+	v.runTableEntries = nil
+	v.updateRunTable()
+}
+
+func (v *ActionsView) renderFilterBar() string {
+	sep := lipgloss.NewStyle().Foreground(styles.Muted).Render(" │ ")
+	var parts []string
+	for i, sf := range statusFilters {
+		if i == v.statusIdx {
+			parts = append(parts, lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render(sf.label))
+		} else {
+			parts = append(parts, lipgloss.NewStyle().Foreground(styles.Muted).Render(sf.label))
+		}
+	}
+	statusPart := strings.Join(parts, sep)
+
+	wfName := "All Workflows"
+	if v.wfTable.Cursor >= 0 && v.wfTable.Cursor < len(v.workflows) {
+		wfName = v.workflows[v.wfTable.Cursor].Name
+	}
+	wfPart := lipgloss.NewStyle().Bold(true).Foreground(styles.Secondary).Render(wfName)
+
+	hint := lipgloss.NewStyle().Foreground(styles.Muted).Italic(true).Render("  s:status")
+	line := " " + statusPart + "  ║  " + wfPart + hint
+
+	return lipgloss.NewStyle().Width(v.width).MaxWidth(v.width).Render(line)
 }
 
 func truncate(s string, maxLen int) string {

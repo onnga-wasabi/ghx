@@ -17,8 +17,9 @@ A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in 
 ## Features
 
 - **Unified Dashboard** — PRs, Issues, Actions, and Notifications in one TUI
-- **Filter Model** — Toggle Open/Closed with `s`, cycle scopes (All/Mine/Review/Involved) with `←`/`→`
-- **Actions Deep Dive** — Workflows → Runs → Jobs → Logs in 4 horizontal panes, with inline job expansion via `Enter`
+- **Consistent Filter Bar** — Every view has a top filter bar with state toggle (`s`) and scope/type cycling (`←`/`→`)
+- **Rich PR Sidebar** — Checks with duration, summary bar (✓ 3  ✗ 1  ⏳ 2), per-file diff stats with visual +/- bars
+- **Actions Deep Dive** — Workflows → Runs → Jobs → Logs in 4 horizontal panes, status filter, inline job expansion via `Enter`
 - **Floating Help** — Press `?` for a centered keybinding overlay
 - **Configurable Tabs** — Show only the tabs you need, in your preferred order
 - **Keyboard First** — Vim-style navigation (`j`/`k`/`g`/`G`), numbered tab switching (`1`-`4`)
@@ -130,6 +131,7 @@ theme:
 
 | Key | Action |
 |-----|--------|
+| `s` | Cycle status filter: All → Success → Failed → Running |
 | `Enter` | Toggle run expansion (show/hide jobs inline) |
 | `r` | Rerun workflow |
 | `Ctrl+R` | Rerun failed jobs |
@@ -138,6 +140,15 @@ theme:
 | `f` | Fullscreen log viewer |
 | `w` | Toggle word wrap |
 | `n`/`N` | Next/Prev search match |
+
+### Notifications
+
+| Key | Action |
+|-----|--------|
+| `s` | Toggle Unread / All |
+| `←`/`→` | Cycle type: All → PR → Issue → Release → CI |
+| `r` | Mark read |
+| `d` | Mark done |
 
 ## Design Philosophy
 

@@ -3,6 +3,7 @@ package keys
 import "github.com/charmbracelet/bubbles/key"
 
 type NotificationKeyMap struct {
+	StateToggle key.Binding
 	MarkRead    key.Binding
 	MarkDone    key.Binding
 	MarkAllRead key.Binding
@@ -10,6 +11,10 @@ type NotificationKeyMap struct {
 }
 
 var Notification = NotificationKeyMap{
+	StateToggle: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "unread/all"),
+	),
 	MarkRead: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "mark read"),
@@ -31,11 +36,11 @@ var Notification = NotificationKeyMap{
 }
 
 func (k NotificationKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.MarkRead, k.MarkDone}
+	return []key.Binding{k.StateToggle, k.MarkRead, k.MarkDone}
 }
 
 func (k NotificationKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.MarkRead, k.MarkDone},
+		{k.StateToggle, k.MarkRead, k.MarkDone},
 	}
 }

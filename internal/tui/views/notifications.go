@@ -13,6 +13,7 @@ import (
 	"github.com/onnga-wasabi/ghx/internal/model"
 	"github.com/onnga-wasabi/ghx/internal/tui/components"
 	"github.com/onnga-wasabi/ghx/internal/tui/keys"
+	"github.com/onnga-wasabi/ghx/internal/tui/styles"
 )
 
 type notifsMsg struct {
@@ -24,14 +25,33 @@ type notifActionMsg struct {
 	err error
 }
 
+type notifTypeFilter struct {
+	label    string
+	typeName string // "" = all
+}
+
+var notifTypeFilters = []notifTypeFilter{
+	{label: "All", typeName: ""},
+	{label: "PR", typeName: "PullRequest"},
+	{label: "Issue", typeName: "Issue"},
+	{label: "Release", typeName: "Release"},
+	{label: "CI", typeName: "CheckSuite"},
+}
+
+const notifFilterBarH = 1
+
 type NotificationsView struct {
 	client *api.Client
 	owner  string
 	repo   string
 
-	notifs  []model.Notification
-	table   *components.Table
-	sidebar *components.Sidebar
+	allNotifs []model.Notification
+	notifs    []model.Notification
+	table     *components.Table
+	sidebar   *components.Sidebar
+
+	stateFilter string // "unread" or "all"
+	typeIdx     int
 
 	showSidebar bool
 	loading     bool
@@ -45,7 +65,9 @@ func NewNotificationsView(client *api.Client, owner, repo string) *Notifications
 		client:      client,
 		owner:       owner,
 		repo:        repo,
-		table:       components.NewTable("Notifications"),
+		stateFilter: "unread",
+		typeIdx:     0,
+		table:       components.NewTable("Notifications · Unread · All"),
 		sidebar:     components.NewSidebar(),
 		showSidebar: true,
 	}
@@ -65,6 +87,13 @@ func (v *NotificationsView) SetSize(w, h int) {
 	v.recalcLayout()
 }
 
+func (v *NotificationsView) listWidth() int {
+	if v.showSidebar {
+		return v.width - int(float64(v.width)*0.35)
+	}
+	return v.width
+}
+
 func (v *NotificationsView) recalcLayout() {
 	listW := v.width
 	sidebarW := 0
@@ -74,7 +103,7 @@ func (v *NotificationsView) recalcLayout() {
 	}
 
 	v.table.Width = listW
-	v.table.Height = v.height
+	v.table.Height = max(4, v.height-notifFilterBarH)
 	v.table.Active = true
 	v.sidebar.SetSize(sidebarW, v.height)
 }
@@ -89,8 +118,8 @@ func (v *NotificationsView) Update(msg tea.Msg) (View, tea.Cmd) {
 			v.err = msg.err
 			return v, nil
 		}
-		v.notifs = msg.notifs
-		v.updateTable()
+		v.allNotifs = msg.notifs
+		v.applyFilter()
 		v.updateSidebar()
 
 	case notifActionMsg:
@@ -128,6 +157,22 @@ func (v *NotificationsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 	case key.Matches(msg, keys.Global.LastLine):
 		v.table.GoToLast()
 		v.updateSidebar()
+	case key.Matches(msg, keys.Notification.StateToggle):
+		if v.stateFilter == "unread" {
+			v.stateFilter = "all"
+		} else {
+			v.stateFilter = "unread"
+		}
+		v.applyFilter()
+		v.updateSidebar()
+	case key.Matches(msg, keys.Global.Right):
+		v.typeIdx = (v.typeIdx + 1) % len(notifTypeFilters)
+		v.applyFilter()
+		v.updateSidebar()
+	case key.Matches(msg, keys.Global.Left):
+		v.typeIdx = (v.typeIdx - 1 + len(notifTypeFilters)) % len(notifTypeFilters)
+		v.applyFilter()
+		v.updateSidebar()
 	case key.Matches(msg, keys.Global.Refresh):
 		return v, v.fetchNotifications()
 	case key.Matches(msg, keys.Global.Open):
@@ -147,6 +192,31 @@ func (v *NotificationsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 		v.recalcLayout()
 	}
 	return v, nil
+}
+
+func (v *NotificationsView) applyFilter() {
+	var filtered []model.Notification
+	typeFilter := notifTypeFilters[v.typeIdx].typeName
+	for _, n := range v.allNotifs {
+		if v.stateFilter == "unread" && !n.Unread {
+			continue
+		}
+		if typeFilter != "" && n.Type != typeFilter {
+			continue
+		}
+		filtered = append(filtered, n)
+	}
+	v.notifs = filtered
+	v.updateTitle()
+	v.updateTable()
+}
+
+func (v *NotificationsView) updateTitle() {
+	state := "Unread"
+	if v.stateFilter == "all" {
+		state = "All"
+	}
+	v.table.Title = fmt.Sprintf("Notifications · %s · %s", state, notifTypeFilters[v.typeIdx].label)
 }
 
 func (v *NotificationsView) selectedNotif() *model.Notification {
@@ -210,17 +280,46 @@ func (v *NotificationsView) updateSidebar() {
 	v.sidebar.Title = n.Title
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "Type:   %s\n", n.Type)
-	fmt.Fprintf(&b, "Repo:   %s\n", n.RepoName)
-	fmt.Fprintf(&b, "Reason: %s\n", n.Reason)
-	fmt.Fprintf(&b, "Unread: %v\n", n.Unread)
+	fmt.Fprintf(&b, "Type:    %s\n", n.Type)
+	fmt.Fprintf(&b, "Repo:    %s\n", n.RepoName)
+	fmt.Fprintf(&b, "Reason:  %s\n", n.Reason)
+	fmt.Fprintf(&b, "Unread:  %v\n", n.Unread)
 	fmt.Fprintf(&b, "Updated: %s\n", n.UpdatedAt.Format("2006-01-02 15:04"))
 
 	v.sidebar.SetContent(b.String())
 }
 
+func (v *NotificationsView) renderFilterBar() string {
+	unreadStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	allStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	if v.stateFilter == "unread" {
+		unreadStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
+	} else {
+		allStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	}
+	statePart := unreadStyle.Render("Unread") + " " + allStyle.Render("All")
+
+	sep := lipgloss.NewStyle().Foreground(styles.Muted).Render(" │ ")
+	var typeParts []string
+	for i, tf := range notifTypeFilters {
+		if i == v.typeIdx {
+			typeParts = append(typeParts, lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render(tf.label))
+		} else {
+			typeParts = append(typeParts, lipgloss.NewStyle().Foreground(styles.Muted).Render(tf.label))
+		}
+	}
+	typePart := strings.Join(typeParts, sep)
+
+	hint := lipgloss.NewStyle().Foreground(styles.Muted).Italic(true).Render("  s:state ←→:type")
+	line := " " + statePart + "  ║  " + typePart + hint
+
+	listW := v.listWidth()
+	return lipgloss.NewStyle().Width(listW).MaxWidth(listW).Render(line)
+}
+
 func (v *NotificationsView) View() string {
-	listPane := v.table.View()
+	filterBar := v.renderFilterBar()
+	listPane := lipgloss.JoinVertical(lipgloss.Left, filterBar, v.table.View())
 
 	if v.showSidebar {
 		return lipgloss.JoinHorizontal(lipgloss.Top, listPane, v.sidebar.View())

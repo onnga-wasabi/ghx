@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -343,7 +344,6 @@ func (v *PRsView) updateSidebar() {
 	fmt.Fprintf(&b, "Author:  %s\n", pr.Author)
 	fmt.Fprintf(&b, "Branch:  %s → %s\n", pr.HeadRef, pr.BaseRef)
 	fmt.Fprintf(&b, "State:   %s\n", pr.State)
-	fmt.Fprintf(&b, "Lines:   +%d -%d\n", pr.Additions, pr.Deletions)
 	if len(pr.Labels) > 0 {
 		fmt.Fprintf(&b, "Labels:  %s\n", strings.Join(pr.Labels, ", "))
 	}
@@ -352,16 +352,48 @@ func (v *PRsView) updateSidebar() {
 	}
 
 	pass, fail, pending := pr.ChecksSummary()
-	if pass+fail+pending > 0 {
+	total := pass + fail + pending
+	if total > 0 {
 		b.WriteString("\n── Checks ──\n")
+		var parts []string
+		if pass > 0 {
+			parts = append(parts, fmt.Sprintf("✓ %d", pass))
+		}
+		if fail > 0 {
+			parts = append(parts, fmt.Sprintf("✗ %d", fail))
+		}
+		if pending > 0 {
+			parts = append(parts, fmt.Sprintf("⏳ %d", pending))
+		}
+		fmt.Fprintf(&b, "  %s  (%d/%d passed)\n", strings.Join(parts, "  "), pass, total)
+
 		for _, c := range pr.Checks {
 			icon := "⏳"
-			if c.Conclusion == "SUCCESS" {
+			switch c.Conclusion {
+			case "SUCCESS":
 				icon = "✓"
-			} else if c.Conclusion == "FAILURE" {
+			case "FAILURE", "TIMED_OUT":
 				icon = "✗"
+			case "CANCELLED":
+				icon = "⊘"
+			case "SKIPPED":
+				icon = "⊘"
 			}
-			fmt.Fprintf(&b, "  %s %s\n", icon, c.Name)
+			dur := ""
+			if !c.StartedAt.IsZero() && !c.CompletedAt.IsZero() {
+				d := c.CompletedAt.Sub(c.StartedAt)
+				dur = " (" + formatCheckDuration(d) + ")"
+			}
+			fmt.Fprintf(&b, "  %s %s%s\n", icon, c.Name, dur)
+		}
+	}
+
+	if pr.ChangedFiles > 0 || len(pr.Files) > 0 {
+		b.WriteString("\n── Diff Stats ──\n")
+		fmt.Fprintf(&b, "  %d files  +%d -%d\n", max(pr.ChangedFiles, len(pr.Files)), pr.Additions, pr.Deletions)
+		for _, f := range pr.Files {
+			bar := diffBar(f.Additions, f.Deletions, 10)
+			fmt.Fprintf(&b, "  %s +%d -%d %s\n", bar, f.Additions, f.Deletions, truncate(f.Path, 35))
 		}
 	}
 
@@ -371,6 +403,35 @@ func (v *PRsView) updateSidebar() {
 	}
 
 	v.sidebar.SetContent(b.String())
+}
+
+func formatCheckDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+func diffBar(add, del, width int) string {
+	total := add + del
+	if total == 0 {
+		return strings.Repeat("·", width)
+	}
+	addW := max(0, add*width/total)
+	delW := max(0, del*width/total)
+	if addW+delW < width && add > 0 {
+		addW++
+	}
+	if addW+delW < width && del > 0 {
+		delW++
+	}
+	rest := width - addW - delW
+	return lipgloss.NewStyle().Foreground(styles.Success).Render(strings.Repeat("+", addW)) +
+		lipgloss.NewStyle().Foreground(styles.Error).Render(strings.Repeat("-", delW)) +
+		lipgloss.NewStyle().Foreground(styles.Muted).Render(strings.Repeat("·", rest))
 }
 
 func (v *PRsView) renderFilterBar() string {

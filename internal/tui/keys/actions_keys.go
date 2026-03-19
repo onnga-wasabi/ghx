@@ -3,6 +3,7 @@ package keys
 import "github.com/charmbracelet/bubbles/key"
 
 type ActionsKeyMap struct {
+	StatusToggle key.Binding
 	Trigger      key.Binding
 	Rerun        key.Binding
 	RerunFailed  key.Binding
@@ -14,6 +15,10 @@ type ActionsKeyMap struct {
 }
 
 var Actions = ActionsKeyMap{
+	StatusToggle: key.NewBinding(
+		key.WithKeys("s"),
+		key.WithHelp("s", "status filter"),
+	),
 	Trigger: key.NewBinding(
 		key.WithKeys("t"),
 		key.WithHelp("t", "trigger workflow"),
@@ -49,12 +54,12 @@ var Actions = ActionsKeyMap{
 }
 
 func (k ActionsKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Trigger, k.Rerun, k.Cancel, k.Fullscreen}
+	return []key.Binding{k.StatusToggle, k.Trigger, k.Rerun, k.Cancel, k.Fullscreen}
 }
 
 func (k ActionsKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Trigger, k.Rerun, k.RerunFailed, k.Cancel},
+		{k.StatusToggle, k.Trigger, k.Rerun, k.RerunFailed, k.Cancel},
 		{k.Fullscreen, k.WordWrap, k.SearchNext, k.SearchPrev},
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/go-github/v68/github"
 	"github.com/onnga-wasabi/ghx/internal/model"
@@ -65,6 +66,7 @@ query($query: String!, $first: Int!) {
         mergeable
         additions
         deletions
+        changedFiles
         headRefName
         baseRefName
         url
@@ -81,6 +83,8 @@ query($query: String!, $first: Int!) {
                 status
                 conclusion
                 detailsUrl
+                startedAt
+                completedAt
               }
               ... on StatusContext {
                 context
@@ -88,6 +92,13 @@ query($query: String!, $first: Int!) {
                 targetUrl
               }
             }
+          }
+        }
+        files(first: 100) {
+          nodes {
+            path
+            additions
+            deletions
           }
         }
         repository { nameWithOwner }
@@ -139,20 +150,21 @@ func (c *Client) SearchPRs(ctx context.Context, query string, limit int) ([]mode
 }
 
 type prNode struct {
-	Number      int      `json:"number"`
-	Title       string   `json:"title"`
-	Body        string   `json:"body"`
-	State       string   `json:"state"`
-	IsDraft     bool     `json:"isDraft"`
-	Mergeable   string   `json:"mergeable"`
-	Additions   int      `json:"additions"`
-	Deletions   int      `json:"deletions"`
-	HeadRefName string   `json:"headRefName"`
-	BaseRefName string   `json:"baseRefName"`
-	URL         string   `json:"url"`
-	CreatedAt   string   `json:"createdAt"`
-	UpdatedAt   string   `json:"updatedAt"`
-	Author      struct {
+	Number       int    `json:"number"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+	State        string `json:"state"`
+	IsDraft      bool   `json:"isDraft"`
+	Mergeable    string `json:"mergeable"`
+	Additions    int    `json:"additions"`
+	Deletions    int    `json:"deletions"`
+	ChangedFiles int    `json:"changedFiles"`
+	HeadRefName  string `json:"headRefName"`
+	BaseRefName  string `json:"baseRefName"`
+	URL          string `json:"url"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+	Author       struct {
 		Login string `json:"login"`
 	} `json:"author"`
 	Labels struct {
@@ -164,37 +176,49 @@ type prNode struct {
 			Nodes []checkNode `json:"nodes"`
 		} `json:"contexts"`
 	} `json:"statusCheckRollup"`
+	Files *struct {
+		Nodes []fileNode `json:"nodes"`
+	} `json:"files"`
 	Repository struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
 }
 
 type checkNode struct {
-	Name       string `json:"name"`
-	Context    string `json:"context"`
-	Status     string `json:"status"`
-	State      string `json:"state"`
-	Conclusion string `json:"conclusion"`
-	DetailsURL string `json:"detailsUrl"`
-	TargetURL  string `json:"targetUrl"`
+	Name        string  `json:"name"`
+	Context     string  `json:"context"`
+	Status      string  `json:"status"`
+	State       string  `json:"state"`
+	Conclusion  string  `json:"conclusion"`
+	DetailsURL  string  `json:"detailsUrl"`
+	TargetURL   string  `json:"targetUrl"`
+	StartedAt   *string `json:"startedAt"`
+	CompletedAt *string `json:"completedAt"`
+}
+
+type fileNode struct {
+	Path      string `json:"path"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
 }
 
 func (n prNode) toModel() model.PR {
 	pr := model.PR{
-		Number:      n.Number,
-		Title:       n.Title,
-		Body:        n.Body,
-		State:       n.State,
-		IsDraft:     n.IsDraft,
-		Mergeable:   n.Mergeable,
-		Additions:   n.Additions,
-		Deletions:   n.Deletions,
-		HeadRef:     n.HeadRefName,
-		BaseRef:     n.BaseRefName,
-		URL:         n.URL,
-		Author:      n.Author.Login,
-		ReviewState: n.ReviewDecision,
-		RepoName:    n.Repository.NameWithOwner,
+		Number:       n.Number,
+		Title:        n.Title,
+		Body:         n.Body,
+		State:        n.State,
+		IsDraft:      n.IsDraft,
+		Mergeable:    n.Mergeable,
+		Additions:    n.Additions,
+		Deletions:    n.Deletions,
+		ChangedFiles: n.ChangedFiles,
+		HeadRef:      n.HeadRefName,
+		BaseRef:      n.BaseRefName,
+		URL:          n.URL,
+		Author:       n.Author.Login,
+		ReviewState:  n.ReviewDecision,
+		RepoName:     n.Repository.NameWithOwner,
 	}
 
 	for _, l := range n.Labels.Nodes {
@@ -213,7 +237,27 @@ func (n prNode) toModel() model.PR {
 				check.Status = c.State
 				check.URL = c.TargetURL
 			}
+			if c.StartedAt != nil {
+				if t, err := time.Parse(time.RFC3339, *c.StartedAt); err == nil {
+					check.StartedAt = t
+				}
+			}
+			if c.CompletedAt != nil {
+				if t, err := time.Parse(time.RFC3339, *c.CompletedAt); err == nil {
+					check.CompletedAt = t
+				}
+			}
 			pr.Checks = append(pr.Checks, check)
+		}
+	}
+
+	if n.Files != nil {
+		for _, f := range n.Files.Nodes {
+			pr.Files = append(pr.Files, model.PRFile{
+				Path:      f.Path,
+				Additions: f.Additions,
+				Deletions: f.Deletions,
+			})
 		}
 	}
 
