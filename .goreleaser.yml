@@ -24,15 +24,16 @@ archives:
   - format: tar.gz
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
-brews:
-  - repository:
-      owner: onnga-wasabi
-      name: homebrew-tap
-    homepage: https://github.com/onnga-wasabi/ghx
-    description: "A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in one place"
-    license: MIT
-    install: |
-      bin.install "ghx"
+# Uncomment after creating onnga-wasabi/homebrew-tap repo:
+# brews:
+#   - repository:
+#       owner: onnga-wasabi
+#       name: homebrew-tap
+#     homepage: https://github.com/onnga-wasabi/ghx
+#     description: "A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in one place"
+#     license: MIT
+#     install: |
+#       bin.install "ghx"
 
 nfpms:
   - homepage: https://github.com/onnga-wasabi/ghx
