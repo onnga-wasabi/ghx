@@ -1,0 +1,105 @@
+---
+description: Bubble Tea TUI レンダリングの不変条件とベストプラクティス
+globs: internal/tui/**/*.go
+alwaysApply: false
+---
+
+# TUI レンダリング不変条件
+
+## 1. lipgloss v1.1.0 の Height/Width はボーダー内部サイズ
+
+`border.Width(W).Height(H)` の出力は **H+2 行、W+2 幅**。
+Height/Width は内部コンテンツ領域を指定し、ボーダーは常に追加される。
+
+```go
+// border.Width(W-2).Height(H-2) → 出力 = H 行, W 幅
+// ボーダーを含めた合計に合わせるには：
+border.Width(totalW - 2).Height(totalH - 2).Render(content)
+```
+
+`Height` は**パディングのみ**（コンテンツが短い場合）。
+`alignTextVertical` はコンテンツが Height を超えても**切り捨てない**。
+切り捨てには `MaxHeight` が必要（ボーダー込みの最終出力に適用される）。
+
+## 2. 各コンポーネントのコンテンツ行数を自前で制御する
+
+lipgloss に高さ制御を任せず、コンテンツ行数を自分で正確に管理する。
+テストで検証済みの最小有効高さ:
+
+| コンポーネント | 最小高さ | 理由 |
+|---|---|---|
+| Table | 3 | border(2) + title(1) |
+| LogViewer | 4 | border(2) + header(1) + viewport(1) |
+| Sidebar | 5 | border(2) + title(1) + separator(1) + viewport(1) |
+
+```go
+// ✅ GOOD: コンテンツ行数を自前で管理
+lines = lines[:innerH]  // 安全にトランケート
+content := strings.Join(lines, "\n")
+border.Height(innerH).Render(content)  // 出力 = innerH + 2 = t.Height
+```
+
+## 3. View() でサイズ変更しない（SetSize は Update のみ）
+
+`SetSize` を View 内で呼ぶと、Update で設定した cursor/offset が不整合になる。
+
+サイズ再計算が必要なトリガー: `WindowSizeMsg`, Help toggle, Tab switch
+
+```go
+// ❌ BAD: View() 内で SetSize
+func (a *App) View() string {
+    activeView.SetSize(a.width, contentHeight)
+
+// ✅ GOOD: Update() 内でのみ
+func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    a.recalcSizes()  // ここでのみ SetSize を呼ぶ
+```
+
+## 4. app.go の content wrapper には Height と MaxHeight の両方
+
+```go
+// ✅ 必須: rawContent が短くてもパディング、長くてもクリップ
+content := lipgloss.NewStyle().
+    Width(a.width).
+    Height(a.contentHeight).    // パディング保証
+    MaxHeight(a.contentHeight). // クリップ安全弁
+    Render(rawContent)
+```
+
+Height がないと、rawContent が短い場合に前フレームの残像が出る。
+
+## 5. 文字列の長さ・切り詰めは必ず ansi パッケージを使う
+
+`len(s)` はバイト長、`s[:n]` はバイト位置スライス。マルチバイト文字の途中で切断すると
+**不正な UTF-8 が生成**され、ターミナルの幅計算が狂い、lipgloss のラップで余分な行が出る。
+日本語・絵文字を含むリポジトリでは必ず発生する致命的なバグになる。
+
+```go
+// ❌ BAD: バイト長で判定 → CJK/絵文字で過剰切り詰め or 幅超過
+if len(s) > maxW { s = s[:maxW-1] + "…" }
+
+// ❌ BAD: rune 長で判定 → CJK は1文字2セル幅だが rune では1
+if utf8.RuneCountInString(s) > maxW { ... }
+
+// ✅ GOOD: ビジュアル幅（セル幅）で判定・切り詰め
+if ansi.StringWidth(s) > maxW { s = ansi.Truncate(s, maxW, "…") }
+```
+
+**全ての truncate / 幅チェックで `ansi.StringWidth` と `ansi.Truncate` を使うこと。**
+ヘルパー `truncate()` やテーブルの `renderRow` を含む全箇所。
+
+## 6. 全ビューに非同期メッセージをブロードキャスト
+
+`tea.KeyMsg` はアクティブなビューにのみ送る。
+**それ以外のメッセージ（API応答、Tick等）は全ビューに送る**。
+
+## 7. ログ取得で署名付きURLに認証ヘッダーを送らない
+
+GitHub Actions のジョブログは署名付きURL経由で取得する。
+`oauth2.Transport` はリダイレクト先にも Authorization を送るため CDN が 401 を返す。
+素の `http.Client` を使う。
+
+## 8. テストで不変条件を検証する
+
+`render_test.go` と `distribute_test.go` に不変条件テストがある。
+新しいコンポーネント追加時は必ず出力高さテストを追加する。

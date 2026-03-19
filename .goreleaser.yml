@@ -1,0 +1,51 @@
+version: 2
+
+project_name: ghx
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/main.go
+    binary: ghx
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - repository:
+      owner: onnga-wasabi
+      name: homebrew-tap
+    homepage: https://github.com/onnga-wasabi/ghx
+    description: "A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in one place"
+    license: MIT
+    install: |
+      bin.install "ghx"
+
+nfpms:
+  - homepage: https://github.com/onnga-wasabi/ghx
+    description: "A keyboard-driven TUI for GitHub"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

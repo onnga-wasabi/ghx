@@ -1,0 +1,52 @@
+prSections:
+  - title: My Pull Requests
+    filters: is:open author:@me
+  - title: Needs My Review
+    filters: is:open review-requested:@me
+  - title: Involved
+    filters: is:open involves:@me -author:@me
+  - title: Recently Closed
+    filters: is:closed author:@me sort:updated-desc
+
+issuesSections:
+  - title: My Issues
+    filters: is:open author:@me
+  - title: Assigned
+    filters: is:open assignee:@me
+  - title: Recently Closed
+    filters: is:closed author:@me sort:updated-desc
+
+notificationsSections:
+  - title: All
+    filters: ""
+
+defaults:
+  prsLimit: 20
+  issuesLimit: 20
+  notificationsLimit: 20
+  view: prs # prs | issues | actions | notifications
+  preview:
+    open: true
+    width: 0.45
+  refetchIntervalMinutes: 30
+  smartLayout: true # focused pane expands, others shrink
+
+keybindings:
+  # universal:
+  #   - key: g
+  #     name: lazygit
+  #     command: cd {{.RepoPath}} && lazygit
+  # prs:
+  #   - key: e
+  #     builtin: enhance
+  # actions:
+  #   - key: t
+  #     builtin: trigger
+
+theme:
+  colors:
+    primary: "#7aa2f7"
+    secondary: "#bb9af7"
+    success: "#9ece6a"
+    warning: "#e0af68"
+    error: "#f7768e"
