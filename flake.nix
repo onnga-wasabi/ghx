@@ -8,7 +8,7 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     let
-      version = "0.3.0";
+      version = "0.3.1";
       mkGhx = pkgs: pkgs.buildGoModule {
         pname = "ghx";
         inherit version;
