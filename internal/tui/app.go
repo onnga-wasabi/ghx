@@ -3,10 +3,12 @@ package tui
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/onnga-wasabi/ghx/internal/api"
 	"github.com/onnga-wasabi/ghx/internal/config"
 	"github.com/onnga-wasabi/ghx/internal/tui/components"
@@ -303,11 +305,11 @@ func (a *App) View() string {
 		overlay := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(styles.Primary).
+			Background(styles.BgOverlay).
 			Padding(1, 3).
 			Render(inner)
 
-		return lipgloss.Place(a.width, a.height,
-			lipgloss.Center, lipgloss.Center, overlay)
+		return compositeOverlay(base, overlay, a.width, a.height)
 	}
 
 	return base
@@ -354,4 +356,53 @@ func (a *App) recalcSizes() {
 	for _, v := range a.views {
 		v.SetSize(a.width, a.contentHeight)
 	}
+}
+
+// compositeOverlay renders the overlay centered on top of the background,
+// preserving background content on either side and above/below.
+func compositeOverlay(bg, fg string, totalW, totalH int) string {
+	bgLines := strings.Split(bg, "\n")
+	fgLines := strings.Split(fg, "\n")
+
+	fgH := len(fgLines)
+	fgW := lipgloss.Width(fg)
+
+	startY := max(0, (totalH-fgH)/2)
+	startX := max(0, (totalW-fgW)/2)
+
+	for len(bgLines) < totalH {
+		bgLines = append(bgLines, strings.Repeat(" ", totalW))
+	}
+
+	for i, fgLine := range fgLines {
+		y := startY + i
+		if y >= len(bgLines) {
+			break
+		}
+		bgLine := bgLines[y]
+		lineW := ansi.StringWidth(bgLine)
+		if lineW < totalW {
+			bgLine += strings.Repeat(" ", totalW-lineW)
+		}
+
+		left := ansi.Truncate(bgLine, startX, "")
+		leftW := ansi.StringWidth(left)
+		if leftW < startX {
+			left += strings.Repeat(" ", startX-leftW)
+		}
+
+		right := ""
+		rightStart := startX + fgW
+		if rightStart < totalW {
+			right = ansi.Cut(bgLine, rightStart, totalW)
+		}
+
+		bgLines[y] = left + fgLine + right
+	}
+
+	if len(bgLines) > totalH {
+		bgLines = bgLines[:totalH]
+	}
+
+	return strings.Join(bgLines, "\n")
 }

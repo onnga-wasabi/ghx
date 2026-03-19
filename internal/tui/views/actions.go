@@ -88,11 +88,12 @@ type ActionsView struct {
 	runJobs         map[int64][]model.Job
 	runTableEntries []runTableEntry
 
-	statusIdx   int
+	statusIdx     int
 	selectedWfIdx int
 
 	focusPane   int // 0=workflows, 1=runs, 2=jobs, 3=logs
 	fullscreen  bool
+	showLogs    bool
 	smartLayout bool
 
 	loading    bool
@@ -125,6 +126,7 @@ func NewActionsView(client *api.Client, owner, repo string, smartLayout bool) *A
 		jobTable:     components.NewTable("Jobs"),
 		logViewer:    components.NewLogViewer(),
 		spinner:      s,
+		showLogs:     true,
 		smartLayout:  smartLayout,
 		expandedRuns: make(map[int64]bool),
 		runJobs:      make(map[int64][]model.Job),
@@ -178,7 +180,33 @@ func (v *ActionsView) recalcLayout() {
 	ph := v.paneHeight()
 	var wfW, runW, jobW, logW int
 
-	if v.smartLayout {
+	if !v.showLogs {
+		if v.smartLayout {
+			const shrunk = 10
+			switch v.focusPane {
+			case 0:
+				wfW = v.width * 30 / 100
+				runW = v.width * 35 / 100
+				jobW = v.width - wfW - runW
+			case 1:
+				wfW = v.width * shrunk / 100
+				runW = v.width * 50 / 100
+				jobW = v.width - wfW - runW
+			case 2:
+				wfW = v.width * shrunk / 100
+				runW = v.width * 20 / 100
+				jobW = v.width - wfW - runW
+			default:
+				wfW = v.width * 25 / 100
+				runW = v.width * 35 / 100
+				jobW = v.width - wfW - runW
+			}
+		} else {
+			wfW = v.width * 25 / 100
+			runW = v.width * 35 / 100
+			jobW = v.width - wfW - runW
+		}
+	} else if v.smartLayout {
 		const shrunk = 10
 		switch v.focusPane {
 		case 0:
@@ -215,12 +243,14 @@ func (v *ActionsView) recalcLayout() {
 	v.runTable.Height = ph
 	v.jobTable.Width = jobW
 	v.jobTable.Height = ph
-	v.logViewer.SetSize(logW, ph)
+	if v.showLogs {
+		v.logViewer.SetSize(logW, ph)
+	}
 
 	v.wfTable.Active = v.focusPane == 0
 	v.runTable.Active = v.focusPane == 1
 	v.jobTable.Active = v.focusPane == 2
-	v.logViewer.Active = v.focusPane == 3
+	v.logViewer.Active = v.focusPane == 3 && v.showLogs
 }
 
 func (v *ActionsView) Update(msg tea.Msg) (View, tea.Cmd) {
@@ -319,7 +349,11 @@ func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 		}
 		return v, nil
 	case key.Matches(msg, keys.Global.Right):
-		if v.focusPane < 3 {
+		maxPane := 3
+		if !v.showLogs {
+			maxPane = 2
+		}
+		if v.focusPane < maxPane {
 			v.focusPane++
 			v.recalcLayout()
 		}
@@ -348,6 +382,16 @@ func (v *ActionsView) handleKey(msg tea.KeyMsg) (View, tea.Cmd) {
 		return v, v.triggerSelected()
 	case key.Matches(msg, keys.Actions.Fullscreen):
 		v.fullscreen = !v.fullscreen
+		if v.fullscreen {
+			v.showLogs = true
+		}
+		v.recalcLayout()
+		return v, nil
+	case key.Matches(msg, keys.Actions.LogToggle):
+		v.showLogs = !v.showLogs
+		if !v.showLogs && v.focusPane == 3 {
+			v.focusPane = 2
+		}
 		v.recalcLayout()
 		return v, nil
 	case key.Matches(msg, keys.Actions.WordWrap):
@@ -457,7 +501,7 @@ func (v *ActionsView) onSelectionChange() tea.Cmd {
 		if entry.isRun {
 			return v.fetchJobs(entry.runID)
 		}
-		return v.fetchLogs(entry.jobID)
+		return v.fetchLogsForInlineJob(entry.runID, entry.jobID)
 	case 2:
 		if j := v.selectedJob(); j != nil {
 			return v.fetchLogs(j.ID)
@@ -530,7 +574,38 @@ func (v *ActionsView) fetchJobs(runID int64) tea.Cmd {
 	}
 }
 
+func (v *ActionsView) fetchLogsForInlineJob(runID, jobID int64) tea.Cmd {
+	if jobs, ok := v.runJobs[runID]; ok {
+		for i := range jobs {
+			if jobs[i].ID == jobID && jobs[i].Status != "completed" {
+				v.logViewer.SetContent(fmt.Sprintf(
+					"  ⏳ Job is %s — logs available after completion.\n\n  Press R to refresh.",
+					jobs[i].Status,
+				))
+				return nil
+			}
+		}
+	}
+	return v.fetchLogs(jobID)
+}
+
 func (v *ActionsView) fetchLogs(jobID int64) tea.Cmd {
+	var targetJob *model.Job
+	for i := range v.jobs {
+		if v.jobs[i].ID == jobID {
+			targetJob = &v.jobs[i]
+			break
+		}
+	}
+
+	if targetJob != nil && targetJob.Status != "completed" {
+		v.logViewer.SetContent(fmt.Sprintf(
+			"  ⏳ Job is %s — logs available after completion.\n\n  Press R to refresh.",
+			targetJob.Status,
+		))
+		return nil
+	}
+
 	v.loading = true
 	v.loadingMsg = "Loading logs..."
 	v.logViewer.SetContent("")
@@ -720,12 +795,21 @@ func (v *ActionsView) View() string {
 	}
 
 	filterBar := v.renderFilterBar()
-	panes := lipgloss.JoinHorizontal(lipgloss.Top,
-		v.wfTable.View(),
-		v.runTable.View(),
-		v.jobTable.View(),
-		v.logViewer.View(),
-	)
+	var panes string
+	if v.showLogs {
+		panes = lipgloss.JoinHorizontal(lipgloss.Top,
+			v.wfTable.View(),
+			v.runTable.View(),
+			v.jobTable.View(),
+			v.logViewer.View(),
+		)
+	} else {
+		panes = lipgloss.JoinHorizontal(lipgloss.Top,
+			v.wfTable.View(),
+			v.runTable.View(),
+			v.jobTable.View(),
+		)
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, filterBar, panes)
 }
 

@@ -9,6 +9,7 @@ type ActionsKeyMap struct {
 	RerunFailed  key.Binding
 	Cancel       key.Binding
 	Fullscreen   key.Binding
+	LogToggle    key.Binding
 	WordWrap     key.Binding
 	SearchNext   key.Binding
 	SearchPrev   key.Binding
@@ -39,6 +40,10 @@ var Actions = ActionsKeyMap{
 		key.WithKeys("f"),
 		key.WithHelp("f", "fullscreen log"),
 	),
+	LogToggle: key.NewBinding(
+		key.WithKeys("L"),
+		key.WithHelp("L", "toggle log pane"),
+	),
 	WordWrap: key.NewBinding(
 		key.WithKeys("w"),
 		key.WithHelp("w", "word wrap"),
@@ -54,12 +59,12 @@ var Actions = ActionsKeyMap{
 }
 
 func (k ActionsKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.StatusToggle, k.Trigger, k.Rerun, k.Cancel, k.Fullscreen}
+	return []key.Binding{k.StatusToggle, k.Trigger, k.Rerun, k.Cancel, k.Fullscreen, k.LogToggle}
 }
 
 func (k ActionsKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.StatusToggle, k.Trigger, k.Rerun, k.RerunFailed, k.Cancel},
-		{k.Fullscreen, k.WordWrap, k.SearchNext, k.SearchPrev},
+		{k.Fullscreen, k.LogToggle, k.WordWrap, k.SearchNext, k.SearchPrev},
 	}
 }

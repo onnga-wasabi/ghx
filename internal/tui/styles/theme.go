@@ -14,6 +14,7 @@ var (
 	Muted     = lipgloss.Color("#565f89")
 	Text      = lipgloss.Color("#c0caf5")
 	BgDark    = lipgloss.Color("#1a1b26")
+	BgOverlay = lipgloss.Color("#24283b")
 
 	Bold     = lipgloss.NewStyle().Bold(true)
 	Faint    = lipgloss.NewStyle().Foreground(Muted)
