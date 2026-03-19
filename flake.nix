@@ -8,17 +8,13 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     let
-      version = "0.2.0";
+      version = "0.3.0";
       mkGhx = pkgs: pkgs.buildGoModule {
         pname = "ghx";
         inherit version;
         src = ./.;
         vendorHash = "sha256-VBw8nOlFkyKuGB+3ZFejQZxQ7PYgYvRJpFw4iFZXBv4=";
-        subPackages = [ "cmd" ];
-
-        postInstall = ''
-          mv $out/bin/cmd $out/bin/ghx 2>/dev/null || true
-        '';
+        subPackages = [ "cmd/ghx" ];
 
         ldflags = [
           "-s" "-w"

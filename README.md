@@ -105,7 +105,7 @@ Instead, we made the handoff seamless: press `o` to open in the browser, `d` to 
 ```bash
 # Install (pick one)
 brew install onnga-wasabi/tap/ghx       # Homebrew
-go install github.com/onnga-wasabi/ghx/cmd/main.go@latest  # Go
+go install github.com/onnga-wasabi/ghx/cmd/ghx@latest  # Go
 nix profile install github:onnga-wasabi/ghx                 # Nix
 
 # Prerequisite: GitHub CLI must be authenticated
@@ -129,7 +129,7 @@ brew install onnga-wasabi/tap/ghx
 ### Go
 
 ```bash
-go install github.com/onnga-wasabi/ghx/cmd/main.go@latest
+go install github.com/onnga-wasabi/ghx/cmd/ghx@latest
 ```
 
 ### From Source

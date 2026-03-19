@@ -5,10 +5,10 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o ghx ./cmd/main.go
+	go build -ldflags "$(LDFLAGS)" -o ghx ./cmd/ghx/main.go
 
 install:
-	go install -ldflags "$(LDFLAGS)" ./cmd/main.go
+	go install -ldflags "$(LDFLAGS)" ./cmd/ghx/main.go
 
 test:
 	go test -count=1 ./...

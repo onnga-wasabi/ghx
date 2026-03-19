@@ -5,11 +5,11 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/spf13/cobra"
 	"github.com/onnga-wasabi/ghx/internal/api"
 	"github.com/onnga-wasabi/ghx/internal/auth"
 	"github.com/onnga-wasabi/ghx/internal/repo"
 	"github.com/onnga-wasabi/ghx/internal/tui"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -105,3 +105,4 @@ func splitRepo(s string) []string {
 	}
 	return nil
 }
+
