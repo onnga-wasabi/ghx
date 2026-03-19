@@ -1,6 +1,7 @@
 # Binary
 ghx
 dist/
+result
 
 # IDE
 .idea/
