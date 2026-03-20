@@ -6,30 +6,6 @@ ghx is a keyboard-driven TUI that brings PRs, Issues, Actions, and Notifications
 
 ![ghx demo](docs/demo.gif)
 
-```
- 1:PRs  2:Issues  3:Actions  4:Notifications
- Open Closed  ║  All │ Mine │ Review │ Involved      s:state ←→:scope
-╭─ Pull Requests · Open · All ──────────╮╭─ #96 staging deploy fix ────────────╮
-│▸ ● #96 staging deploy fix    alice  3/│ Author:  alice                       │
-│  ● #95 add health check      bob   2/│ Branch:  staging-fix → main          │
-│  ◇ #94 WIP: refactor auth    carol   │ Review:  APPROVED                    │
-│  ◆ #93 fix rate limiter      alice   │                                      │
-│  ○ #92 remove legacy API     dave    │ ── Checks ──                         │
-│                                       │   ✓ 3  ✗ 1  ⏳ 0  (3/4 passed)      │
-│                                       │   ✓ Build (1m42s)                    │
-│                                       │   ✓ Lint (32s)                       │
-│                                       │   ✓ Unit Tests (2m14s)              │
-│                                       │   ✗ E2E Tests (4m01s)               │
-│                                       │                                      │
-│                                       │ ── Diff Stats ──                     │
-│                                       │   4 files  +56 -12                   │
-│                                       │   +++--····· +28 -6  src/api/client  │
-│                                       │   ++········ +12 -0  src/api/auth    │
-│                                       │   +--······· +8  -4  tests/api_test  │
-│                                       │   +-········ +8  -2  README.md       │
-╰───────────────────────────────────────╯╰─────────────────────────────────────╯
- ? help  q quit  s open/closed  ←→ scope  o open  a approve       owner/repo
-```
 
 ## Why ghx?
 
