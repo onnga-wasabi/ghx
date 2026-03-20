@@ -291,3 +291,7 @@ ghx stands on the shoulders of great tools:
 ## License
 
 [MIT](LICENSE)
+
+## Disclaimer
+
+This project is provided "AS IS". See [DISCLAIMER.md](DISCLAIMER.md) for details (including limitation of liability).
