@@ -28,6 +28,10 @@ brews:
   - repository:
       owner: onnga-wasabi
       name: homebrew-tap
+      # Release 生成は GitHub Actions の GITHUB_TOKEN で行い、
+      # Homebrew tap 更新だけ別トークン（GH_PAT）で行う。
+      # このトークンは workflow 側で HOMEBREW_TAP_GITHUB_TOKEN に渡される。
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/onnga-wasabi/ghx
     description: "A keyboard-driven TUI for GitHub — PRs, Issues, Actions, and Notifications in one place"
     license: MIT
