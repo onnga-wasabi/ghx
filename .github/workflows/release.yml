@@ -38,5 +38,7 @@ jobs:
           version: v2.14.3
           args: release --clean
         env:
-          # homebrew-tap は別リポジトリのため、GH_PAT が必要
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          # ghx 側の Release は Actions 標準の GITHUB_TOKEN で行う
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # homebrew-tap 更新だけ、別トークンを使う
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
