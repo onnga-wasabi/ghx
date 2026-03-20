@@ -21,10 +21,22 @@ jobs:
         with:
           go-version: "1.25"
 
+      - name: Verify GH_PAT is set
+        # homebrew tap は別リポジトリなので、デフォルト GITHUB_TOKEN では権限不足になりがちです。
+        # そのためクロスリポジトリ更新用の GH_PAT を必須化します（未設定なら失敗させます）。
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "${GH_PAT:-}" ]; then
+            echo "ERROR: secrets.GH_PAT is not set. Needed to update homebrew-tap." >&2
+            exit 1
+          fi
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
           # サプライチェーン不安を減らすために GoReleaser 本体も固定する
           version: v2.14.3
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          # homebrew-tap は別リポジトリのため、GH_PAT が必要
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
