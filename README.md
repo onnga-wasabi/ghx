@@ -4,8 +4,8 @@
 
 ghx is a keyboard-driven TUI that brings PRs, Issues, Actions, and Notifications into a single, unified dashboard. It's built for developers who live in the terminal and want to triage their GitHub workflow without context-switching to the browser.
 
-<!-- TODO: Replace with a real screenshot or GIF demo -->
-<!-- ![ghx demo](https://raw.githubusercontent.com/onnga-wasabi/ghx/main/docs/demo.gif) -->
+<!-- TODO: Replace with a real GIF demo (docs/demo.gif) -->
+<!-- ![ghx demo](docs/demo.gif) -->
 
 ```
  1:PRs  2:Issues  3:Actions  4:Notifications
