@@ -291,3 +291,10 @@ ghx stands on the shoulders of great tools:
 ## License
 
 [MIT](LICENSE)
+
+## Security
+
+Vulnerability reports are handled via GitHub Security Advisories:
+https://github.com/onnga-wasabi/ghx/security/advisories/new
+
+See also: [.github/SECURITY.md](.github/SECURITY.md).
