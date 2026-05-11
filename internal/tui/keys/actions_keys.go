@@ -69,12 +69,12 @@ var Actions = ActionsKeyMap{
 		key.WithHelp("x", "collapse all sections"),
 	),
 	NextSection: key.NewBinding(
-		key.WithKeys("]"),
-		key.WithHelp("]", "next section"),
+		key.WithKeys("]", "J"),
+		key.WithHelp("]/J", "next section"),
 	),
 	PrevSection: key.NewBinding(
-		key.WithKeys("["),
-		key.WithHelp("[", "prev section"),
+		key.WithKeys("[", "K"),
+		key.WithHelp("[/K", "prev section"),
 	),
 }
 
